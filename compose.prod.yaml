@@ -1,0 +1,4 @@
+services:
+  app:
+    image: ghcr.io/zisis912/brukelbot3:latest
+    build: !reset null   # don't build, only pull

@@ -1,0 +1,11 @@
+services:
+  app:
+    env_file:
+      - .env
+    build: .
+    restart: unless-stopped
+    volumes:
+      - db-data:/app/data
+
+volumes:
+  db-data:

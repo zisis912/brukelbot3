@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO nigga_leaderboard VALUES(?,?)\n                ON CONFLICT(user_id) DO UPDATE SET nigga_count = nigga_count + ?;",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "5af414e5eff204bc73aa4e5a6bd1d970839aa72b76b9779c2c3ef93354149d66"
+}

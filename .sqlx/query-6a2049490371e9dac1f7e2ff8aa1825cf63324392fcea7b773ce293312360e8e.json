@@ -1,0 +1,38 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT user_id AS \"id!\", nigga_count AS \"count!\" FROM nigga_leaderboard;",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!",
+        "ordinal": 0,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "nigga_leaderboard",
+            "name": "user_id"
+          }
+        }
+      },
+      {
+        "name": "count!",
+        "ordinal": 1,
+        "type_info": "Integer",
+        "origin": {
+          "Table": {
+            "table": "nigga_leaderboard",
+            "name": "nigga_count"
+          }
+        }
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      true,
+      false
+    ]
+  },
+  "hash": "6a2049490371e9dac1f7e2ff8aa1825cf63324392fcea7b773ce293312360e8e"
+}
