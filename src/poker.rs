@@ -2,18 +2,10 @@ use std::{cmp::Ordering, collections::HashMap, fmt, time::Duration};
 
 use enum_discriminant::discriminant;
 use rand::seq::SliceRandom;
-use serenity::{
-    all::{Context, Message},
-    http,
-};
 use tokio::time::{self, Instant};
+use crate::serenity;
 
-use crate::{
-    CommandError::{self, InvalidArgCount},
-    Handler,
-    coinflip::GameEvent,
-    nigga_balance, nigga_increment,
-};
+use crate::coinflip::GameEvent;
 
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -82,7 +74,7 @@ enum PokerMove {
 struct CardHand([NormalCard; 5]);
 
 #[derive(Clone)]
-struct PokerPlayerState {
+struct PokerPlayer {
     pub id: u64,
     pub accepted: bool,
     hand: CardHand,
@@ -93,7 +85,7 @@ struct PokerPlayerState {
 }
 
 struct PokerGame {
-    players: Vec<PokerPlayerState>,
+    players: Vec<PokerPlayer>,
     most_recent_join: Instant,
     ante: u64,
     state: GameState,
@@ -166,35 +158,35 @@ impl From<CardHand> for PokerHand {
             .all(|w| w[0].rank as u8 - w[1].rank as u8 == 1);
 
         // card rank that exists EXACTLY 4 times
-        let four_of_a_kind = ranks.iter().find(|(k, v)| **v == 4);
+        let four_of_a_kind = ranks.iter().find(|(_,v)| **v == 4);
 
         // card rank that exists EXACTLY 3 times
-        let three_of_a_kind = ranks.iter().find(|(k, v)| **v == 3);
+        let three_of_a_kind = ranks.iter().find(|(_,v)| **v == 3);
 
-        // card ranks that exist less than 3 times (unique, sorted)
+        // card ranks that exist less than 3 times (unique, sorted highest-> lowest)
         let mut not_three_of_a_kind: Vec<CardRank> = ranks
             .iter()
-            .filter(|(k, v)| **v != 3)
-            .map(|(k, v)| *k)
+            .filter_map(|(k, v)| (**v != 3).then_some(*k))
             .collect();
         not_three_of_a_kind.sort_by(|c1, c2| c1.cmp(c2).reverse());
 
         // card ranks that exist EXACTLY 2 times ( sorted highest->lowest)
         let mut two_of_a_kind: Vec<CardRank> = ranks
             .iter()
-            .filter(|(k, v)| **v == 2)
-            .map(|(k, v)| *k)
+            .filter_map(|(k, v)| (**v == 2).then_some(*k))
             .collect();
         two_of_a_kind.sort_by(|c1, c2| c1.cmp(c2).reverse());
 
+        // card ranks which are NOT 2 of a kind (sorted highest-> lowest)
         let mut not_two_of_a_kind: Vec<CardRank> = ranks
             .iter()
-            .filter(|(k, v)| **v != 2)
-            .map(|(k, v)| *k)
+            .filter_map(|(k, v)| (**v != 2).then_some(*k))
             .collect();
         not_two_of_a_kind.sort_by_key(|c| *c as u8);
         not_two_of_a_kind.reverse();
-        let one_of_a_kind = ranks.iter().find(|(k, v)| **v == 1);
+
+        // one of a kind
+        let one_of_a_kind = ranks.iter().find(|(_, v)| **v == 1);
 
         if flush && straight {
             return PokerHand::StraightFlush(max_rank);
@@ -524,7 +516,7 @@ impl PokerGame {
     fn advance_turn(&mut self) {
         self.turn = (self.turn + 1) % self.players.len() as u8;
     }
-    fn player_in_turn(&self) -> &PokerPlayerState {
+    fn player_in_turn(&self) -> &PokerPlayer {
         &self.players[self.turn as usize]
     }
     fn fold_current_player(&mut self) {
@@ -589,14 +581,15 @@ const TEMPLATE_HAND: CardHand = CardHand(
     }; 5],
 );
 
-impl Handler {
-    // coinflip command
-    pub async fn poker(
-        &self,
-        msg: &Message,
-        ctx: &Context,
-        args: Vec<&str>,
-    ) -> Result<(), CommandError> {
+    // poker command
+#[poise::command(
+    slash_command,
+    prefix_command,
+    aliases("cf"),
+    subcommands("send", "accept", "cancel"),
+    subcommand_required,
+)]
+pub async fn poker(_: Context<'_>) -> Result<(), Error> {
         match args[0] {
             "send" => {
                 // max 6 players
@@ -628,7 +621,7 @@ impl Handler {
 
                 let challenger = msg.author.id.get();
 
-                let mut event_listener = self.channel_send.subscribe();
+                let mut event_rx = self.channel_send.subscribe();
 
                 let pool = self.pool.clone();
 
@@ -651,9 +644,9 @@ impl Handler {
                     }
                 }
 
-                let mut players: Vec<PokerPlayerState> = invitees
+                let mut players: Vec<PokerPlayer> = invitees
                     .iter()
-                    .map(|id| PokerPlayerState {
+                    .map(|id| PokerPlayer {
                         id: *id,
                         accepted: false,
                         hand: TEMPLATE_HAND,
@@ -749,7 +742,7 @@ impl Handler {
                                     .unwrap();
                                 break;
                             } else {
-                                match event_listener.try_recv() {
+                                match event_rx.try_recv() {
                                     // if a single person cancels, quit
                                     Ok(GameEvent::PokerCancelEvent { invitee, inviter }) => {
                                         if inviter == challenger
@@ -921,7 +914,7 @@ impl Handler {
                         }
 
                         // player checks
-                        match event_listener.try_recv() {
+                        match event_rx.try_recv() {
                             Ok(GameEvent::PokerCheck { checker }) => {
                                 if checker == game.player_in_turn().id {
                                     if game.call == 0 {
@@ -1135,4 +1128,35 @@ impl Handler {
         }
         Ok(())
     }
+}
+
+
+#[poise::command(prefix_command, slash_command)]
+pub async fn send(
+    ctx: Context<'_>,
+
+    #[description = "enemy"] opp: serenity::User,
+    #[description = "bid"] bid: i64,
+) -> Result<(), Error> {
+    todo!();
+}
+
+#[poise::command(prefix_command, slash_command)]
+pub async fn send(
+    ctx: Context<'_>,
+
+    #[description = "enemy"] opp: serenity::User,
+    #[description = "bid"] bid: i64,
+) -> Result<(), Error> {
+    todo!();
+}
+
+#[poise::command(prefix_command, slash_command)]
+pub async fn send(
+    ctx: Context<'_>,
+
+    #[description = "enemy"] opp: serenity::User,
+    #[description = "bid"] bid: i64,
+) -> Result<(), Error> {
+    todo!();
 }
