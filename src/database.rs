@@ -1,9 +1,13 @@
-use regex::Regex;
+use serenity::model::id::UserId;
 use sqlx::SqlitePool;
 
 #[derive(Clone)]
 pub struct Database {
     pub pool: SqlitePool,
+}
+pub struct Ranking {
+    pub id: i64,
+    pub count: i64,
 }
 
 impl Database {
@@ -17,8 +21,12 @@ impl Database {
         Ok(Self { pool: sql_pool })
     }
 
-    pub async fn nigga_increment(&self, user_id: u64, increment: i64) -> Result<(), sqlx::Error> {
-        println!("{},{}", user_id, increment);
+    pub async fn nigga_increment(
+        &self,
+        user_id: UserId,
+        increment: i64,
+    ) -> Result<(), sqlx::Error> {
+        let user_id = user_id.get();
         sqlx::query!(
             "INSERT INTO nigga_leaderboard VALUES(?,?)
                 ON CONFLICT(user_id) DO UPDATE SET nigga_count = nigga_count + ?;",
@@ -32,7 +40,8 @@ impl Database {
         Ok(())
     }
 
-    pub async fn nigga_balance(&self, user_id: u64) -> Result<i64, sqlx::Error> {
+    pub async fn nigga_balance(&self, user_id: UserId) -> Result<i64, sqlx::Error> {
+        let user_id = user_id.get();
         let nigbal: i64 = sqlx::query!(
             r#"SELECT nigga_count AS "nigbal!" FROM nigga_leaderboard WHERE user_id = ?;"#,
             user_id as i64
@@ -53,9 +62,4 @@ impl Database {
         .fetch_all(&self.pool)
         .await
     }
-}
-
-pub struct Ranking {
-    pub id: i64,
-    pub count: i64,
 }

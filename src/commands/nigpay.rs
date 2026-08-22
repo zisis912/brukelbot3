@@ -8,7 +8,7 @@ pub async fn nigpay(
     #[description = "Recipient"] nigrecipient: serenity::User,
     #[description = "count"] nigcount: i64,
 ) -> Result<(), Error> {
-    let nigsender = ctx.author().id.get();
+    let nigsender = ctx.author().id;
 
     if nigcount <= 0 {
         ctx.say("no negatives").await?;
@@ -24,7 +24,7 @@ pub async fn nigpay(
         return Ok(());
     }
 
-    db.nigga_increment(nigrecipient.id.get(), nigcount).await?;
+    db.nigga_increment(nigrecipient.id, nigcount).await?;
     db.nigga_increment(nigsender, -nigcount).await?;
 
     ctx.say("sent").await?;
