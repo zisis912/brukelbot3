@@ -81,7 +81,9 @@ async fn message(
                 // Sending a message can fail, due to a network error, an authentication error, or lack
                 // of permissions to post in the channel, so log to stdout when some error happens,
                 // with a description of it.
-                let attachment = CreateAttachment::path("./assets/ohm.png").await.unwrap();
+                let attachment =
+                    CreateAttachment::bytes(include_bytes!("../assets/ohm.png"), "ohm.png");
+
                 let builder = CreateMessage::new()
                     .content("ohm")
                     .tts(false)
